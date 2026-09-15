@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WebGIS Belém Alimentar</title>
+<meta name="description" content="WebGIS da agricultura urbana e do abastecimento alimentar de Belém – Produto 2 da tese (PPGEDAM/UFPA)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="lib/leaflet.css">
+<style>
+:root{
+  --ground:#F3F6F1; --surface:#FFFFFF; --surface-2:#E9EFE6; --line:#D5DED1;
+  --ink:#16241B; --ink-2:#4A5C50; --ink-3:#6F8175;
+  --forest:#1E4A33; --leaf:#2F7D4F; --leaf-soft:#DCEBDF;
+  --feira:#E8B622; --focus:#1F6FB2;
+  --map-ground:#DCE4D8; --shadow:0 1px 2px rgba(22,36,27,.08),0 8px 24px rgba(22,36,27,.10);
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1511; --surface:#141D17; --surface-2:#1B261F; --line:#2A382F;
+    --ink:#E3EBE4; --ink-2:#AFC0B4; --ink-3:#83958A;
+    --forest:#9FD3B0; --leaf:#5DB582; --leaf-soft:#1F3427;
+    --feira:#F0C640; --focus:#6DB3F2; --map-ground:#1A231D; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1511; --surface:#141D17; --surface-2:#1B261F; --line:#2A382F;
+  --ink:#E3EBE4; --ink-2:#AFC0B4; --ink-3:#83958A;
+  --forest:#9FD3B0; --leaf:#5DB582; --leaf-soft:#1F3427;
+  --feira:#F0C640; --focus:#6DB3F2; --map-ground:#1A231D; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.45 var(--f-body);overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-rows:auto 1fr}
+/* ---------- header ---------- */
+.top{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--forest);color:#F3F6F1;flex-wrap:wrap}
+:root[data-theme="dark"] .top{color:#0E1511}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .top{color:#0E1511}}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{font:700 20px/1.1 var(--f-display);margin:0;letter-spacing:-.01em;white-space:nowrap}
+.brand small{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;opacity:.8;white-space:nowrap}
+.search{position:relative;margin-left:auto;flex:1 1 260px;max-width:380px}
+.search input{width:100%;border:0;border-radius:6px;padding:8px 12px 8px 34px;background:rgba(255,255,255,.14);color:inherit}
+.search input::placeholder{color:inherit;opacity:.7}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.8}
+.results{position:absolute;z-index:1200;top:calc(100% + 6px);left:0;right:0;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);max-height:320px;overflow:auto;padding:4px}
+.results button{display:flex;width:100%;justify-content:space-between;gap:12px;text-align:left;border:0;background:none;padding:7px 10px;border-radius:5px;cursor:pointer}
+.results button:hover,.results button.active{background:var(--leaf-soft)}
+.results em{font:normal 11px var(--f-mono);color:var(--ink-3);white-space:nowrap}
+.top .icon-btn{background:rgba(255,255,255,.12);border:0;border-radius:6px;padding:7px 10px;cursor:pointer;color:inherit;font-weight:600}
+
+/* ---------- body ---------- */
+.main{display:grid;grid-template-columns:340px 1fr;min-height:0}
+.side{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 8px}
+.tabs button{flex:1;border:0;background:none;padding:12px 6px 10px;font-weight:600;color:var(--ink-3);border-bottom:2px solid transparent;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--leaf)}
+.pane{overflow:auto;padding:14px 16px 24px;display:flex;flex-direction:column;gap:18px;min-height:0;flex:1}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
+.group{display:flex;flex-direction:column;gap:2px}
+.lyr{display:grid;grid-template-columns:18px 22px 1fr auto;align-items:center;gap:8px;padding:6px 6px;border-radius:6px}
+.lyr:hover{background:var(--surface-2)}
+.lyr input{margin:0;accent-color:var(--leaf);width:16px;height:16px}
+.lyr label{cursor:pointer;line-height:1.25}
+.lyr .n{font:12px var(--f-mono);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.sw{width:18px;height:18px;display:grid;place-items:center}
+.sw i{display:block}
+.sw .pt{width:11px;height:11px;border-radius:50%;border:1.5px solid rgba(0,0,0,.55)}
+.sw .pg{width:16px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.35)}
+.sw .ln{width:16px;height:0;border-top:2px solid}
+.sub{grid-column:3/5;display:flex;flex-direction:column;gap:6px;padding:4px 0 6px}
+.sub select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.ramp{display:flex;flex-direction:column;gap:3px;font:12px var(--f-mono);color:var(--ink-2)}
+.ramp div{display:flex;align-items:center;gap:8px}
+.ramp span{width:22px;height:11px;border:1px solid rgba(0,0,0,.2);border-radius:2px}
+.note{font-size:13px;color:var(--ink-3);margin:0}
+
+/* indicadores */
+.picker{display:flex;flex-direction:column;gap:6px}
+.picker select{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.card{border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--surface)}
+.card h2{font:700 20px/1.15 var(--f-display);margin:0;text-wrap:balance}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.stat b{display:block;font:500 20px/1.1 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--forest)}
+.stat span{font-size:12.5px;color:var(--ink-2);line-height:1.2}
+.bars{display:flex;flex-direction:column;gap:4px}
+.bar{display:grid;grid-template-columns:118px 1fr 52px;gap:8px;align-items:center;font-size:12.5px;border:0;background:none;padding:2px 0;text-align:left;cursor:pointer;border-radius:4px}
+.bar:hover .lbl{text-decoration:underline}
+.bar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .trk{height:10px;background:var(--surface-2);border-radius:2px;overflow:hidden}
+.bar .fill{height:100%;background:var(--leaf)}
+.bar.sel .fill{background:var(--feira)}
+.bar.sel .lbl{font-weight:700}
+.bar .v{font:12px var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.rank-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.rank-head select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--surface);font-size:12.5px}
+
+/* dados */
+.dl{display:grid;grid-template-columns:1fr auto auto;gap:6px 8px;align-items:center}
+.dl .name{font-size:14px;line-height:1.2}
+.dl .name small{display:block;color:var(--ink-3);font:11px var(--f-mono)}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font:500 11.5px var(--f-mono);cursor:pointer}
+.chip:hover{border-color:var(--leaf);background:var(--leaf-soft)}
+.src{font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px}
+.src p{margin:0}
+
+/* map */
+.mapwrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:var(--map-ground)}
+.basemaps{position:absolute;z-index:800;right:12px;bottom:28px;display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+.basemaps button{border:0;background:none;padding:6px 10px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
+.basemaps button[aria-pressed="true"]{background:var(--forest);color:var(--surface)}
+.basemaps button:disabled{opacity:.4;cursor:not-allowed}
+.scaleinfo{position:absolute;z-index:800;left:12px;bottom:28px;font:11px var(--f-mono);background:var(--surface);color:var(--ink-2);border:1px solid var(--line);padding:4px 8px;border-radius:6px}
+.toast{position:absolute;z-index:1300;left:50%;top:14px;transform:translateX(-50%);background:var(--ink);color:var(--ground);padding:8px 14px;border-radius:8px;font-size:13.5px;box-shadow:var(--shadow);max-width:min(90%,460px)}
+.mobile-toggle{display:none}
+
+/* leaflet theming */
+.leaflet-container{font:inherit;background:var(--map-ground)}
+.leaflet-popup-content-wrapper{background:var(--surface);color:var(--ink);border-radius:10px;box-shadow:var(--shadow)}
+.leaflet-popup-tip{background:var(--surface)}
+.leaflet-popup-content{margin:12px 14px;min-width:220px}
+.leaflet-container a.leaflet-popup-close-button{color:var(--ink-3)}
+.pop h3{font:700 16px/1.2 var(--f-display);margin:0 0 2px;text-wrap:balance}
+.pop .k{font:500 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--leaf);margin:0 0 8px}
+.pop dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-size:13px}
+.pop dt{color:var(--ink-3)}
+.pop dd{margin:0;font-variant-numeric:tabular-nums}
+.leaflet-bar a{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.leaflet-control-attribution{background:color-mix(in srgb,var(--surface) 85%,transparent)!important;color:var(--ink-3)}
+.leaflet-control-attribution a{color:var(--ink-2)}
+.leaflet-tooltip{background:var(--surface);color:var(--ink);border-color:var(--line);font-size:12.5px}
+
+@media (max-width:760px){
+  .brand small{display:none}
+  .search{order:3;flex-basis:100%;max-width:none}
+  .main{grid-template-columns:1fr;position:relative}
+  .side{position:absolute;z-index:1000;left:0;right:0;bottom:0;height:58%;border-right:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:var(--shadow);transform:translateY(calc(100% - 46px));transition:transform .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .side.open{transform:none}
+  .mobile-toggle{display:block;border:0;background:none;width:100%;padding:8px 0 2px;cursor:pointer}
+  .mobile-toggle i{display:block;margin:0 auto;width:40px;height:4px;border-radius:2px;background:var(--line)}
+  .basemaps{bottom:60px}
+  .scaleinfo{display:none}
+}
+@media (prefers-reduced-motion:reduce){.side{transition:none}}
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Belém Alimentar</h1>
+      <small>WebGIS · Agricultura urbana e abastecimento</small>
+    </div>
+    <div class="search" role="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" autocomplete="off" placeholder="Buscar bairro, feira, mercado ou escola" aria-label="Buscar no mapa">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="Alternar tema claro/escuro">◐</button>
+  </header>
+
+  <div class="main">
+    <aside class="side" id="side">
+      <button class="mobile-toggle" id="sheetBtn" type="button" aria-label="Abrir painel"><i></i></button>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="t-camadas" aria-selected="true" data-pane="p-camadas">Camadas</button>
+        <button role="tab" id="t-ind" aria-selected="false" data-pane="p-ind">Indicadores</button>
+        <button role="tab" id="t-dados" aria-selected="false" data-pane="p-dados">Dados</button>
+      </div>
+      <div class="pane" id="p-camadas" role="tabpanel"></div>
+      <div class="pane" id="p-ind" role="tabpanel" hidden></div>
+      <div class="pane" id="p-dados" role="tabpanel" hidden></div>
+    </aside>
+    <div class="mapwrap">
+      <div id="map" aria-label="Mapa de Belém"></div>
+      <div class="basemaps" id="basemaps" role="group" aria-label="Mapa-base"></div>
+      <div class="scaleinfo" id="coords">SIRGAS 2000 · WGS84 na web</div>
+      <div class="toast" id="toast" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script src="lib/leaflet.js"></script>
+<script src="data/limite.js"></script>
+<script src="data/bairros.js"></script>
+<script src="data/feiras.js"></script>
+<script src="data/mercados.js"></script>
+<script src="data/portos.js"></script>
+<script src="data/esc_municipal.js"></script>
+<script src="data/esc_estadual.js"></script>
+<script src="data/esc_federal.js"></script>
+<script src="data/agricultura.js"></script>
+<script src="data/potenciais.js"></script>
+<script src="data/agropec_censo.js"></script>
+<script src="data/ucs.js"></script>
+<script src="data/assentamentos.js"></script>
+<script src="data/ambiente_alimentar.js"></script>
+<script src="data/ceasa_origem.js"></script>
+<script src="data/br_pais.js"></script>
+<script src="data/br_uf.js"></script>
+<script src="data/pa_municipios.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
